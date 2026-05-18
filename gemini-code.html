@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>入金消込 組み合わせ計算ツール (スクロール位置補正版)</title>
+    <title>入金消込 組み合わせ計算ツール (削除ボタン常時表示版)</title>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
@@ -13,7 +13,7 @@
             padding: 20px;
         }
         .container {
-            max-width: 1200px;
+            max-width: 1250px;
             margin: 0 auto;
             background: #ffffff;
             padding: 30px;
@@ -157,6 +157,30 @@
             text-align: right;
         }
 
+        .delete-cell {
+            text-align: center;
+            width: 40px;
+        }
+        .delete-btn {
+            background: transparent;
+            color: #a0aec0;
+            border: none;
+            padding: 4px 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: auto;
+            margin: 0;
+            font-weight: normal;
+            transition: color 0.2s, transform 0.1s;
+        }
+        .delete-btn:hover {
+            background: transparent;
+            color: #e53e3e;
+            transform: scale(1.15);
+        }
+
+        /* 【変更】進行中であっても削除ボタンを非表示にするスタイル（display:none）を削除しました */
+
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button {
             -webkit-appearance: none;
@@ -257,14 +281,15 @@
     <div class="main-layout">
         <!-- ① 未消込リスト -->
         <div class="column">
-            <label>① 未消込の請求リスト（最大25件）</label>
+            <label>① 未消込の請求リスト</label>
             <div id="inputTableWrapper" class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
                             <th style="width: 40px;"></th>
                             <th>商品名</th>
-                            <th style="width: 150px;">金額 (円)</th>
+                            <th style="width: 130px;">金額 (円)</th>
+                            <th style="width: 40px;"></th>
                         </tr>
                     </thead>
                     <tbody id="inputTableBody">
@@ -313,7 +338,7 @@
 const CSV_FILE_PATH = 'master.csv'; 
 let PRODUCT_MASTER = {}; 
 
-const ROW_COUNT = 25; 
+const INITIAL_ROW_COUNT = 25; 
 let lastMatchedIndices = []; 
 let isScanning = false;
 let isThrottling = false;
@@ -322,18 +347,87 @@ let audioCtx = null;
 
 window.onload = function() {
     const tbody = document.getElementById('inputTableBody');
-    for (let i = 0; i < ROW_COUNT; i++) {
-        const tr = document.createElement('tr');
-        tr.id = `input-row-${i}`;
-        tr.innerHTML = `
-            <td class="row-num">${i + 1}</td>
-            <td><input type="text" class="cell-name" placeholder="自動または直接入力"></td>
-            <td><input type="number" class="cell-amount amount-cell" placeholder=""></td>
-        `;
-        tbody.appendChild(tr);
+    for (let i = 0; i < INITIAL_ROW_COUNT; i++) {
+        createInputRow(tbody, i);
     }
     loadCsvMaster();
 };
+
+function createInputRow(tbody, index) {
+    const tr = document.createElement('tr');
+    tr.id = `input-row-${index}`;
+    tr.innerHTML = `
+        <td class="row-num">${index + 1}</td>
+        <td><input type="text" class="cell-name" placeholder="自動または直接入力"></td>
+        <td><input type="number" class="cell-amount amount-cell" placeholder=""></td>
+        <td class="delete-cell">
+            <button class="delete-btn" title="この行を削除" onclick="deleteRowData(${index})">✕</button>
+        </td>
+    `;
+    tbody.appendChild(tr);
+    return tr;
+}
+
+function deleteRowData(targetIdx) {
+    const nameInputs = document.querySelectorAll('.cell-name');
+    const amountInputs = document.querySelectorAll('.cell-amount');
+    
+    const targetName = nameInputs[targetIdx].value.trim() || `行 ${targetIdx + 1}`;
+    const targetAmount = amountInputs[targetIdx].value.trim();
+    
+    if (targetName !== `行 ${targetIdx + 1}` || targetAmount !== "") {
+        const amountText = targetAmount ? ` (${parseInt(targetAmount, 10).toLocaleString()}円)` : "";
+        const confirmMessage = `選択した請求データを削除しますか？\n\n対象: ${targetName}${amountText}`;
+        
+        if (!confirm(confirmMessage)) {
+            return; 
+        }
+    }
+
+    const remainingData = [];
+    for (let i = 0; i < nameInputs.length; i++) {
+        if (i !== targetIdx) {
+            const name = nameInputs[i].value.trim();
+            const amount = amountInputs[i].value.trim();
+            if (name !== "" || amount !== "") {
+                remainingData.push({ name: name, amount: amount });
+            }
+        }
+    }
+
+    const tbody = document.getElementById('inputTableBody');
+    const finalRowCount = Math.max(INITIAL_ROW_COUNT, remainingData.length);
+    tbody.innerHTML = "";
+    
+    for (let i = 0; i < finalRowCount; i++) {
+        createInputRow(tbody, i);
+    }
+
+    const newNameInputs = document.querySelectorAll('.cell-name');
+    const newAmountInputs = document.querySelectorAll('.cell-amount');
+    for (let i = 0; i < remainingData.length; i++) {
+        newNameInputs[i].value = remainingData[i].name;
+        newAmountInputs[i].value = remainingData[i].amount;
+    }
+
+    // 【変更】計算結果表示中にデータを削除した場合、不整合を防ぐため計算状態を一度リセットします
+    resetCalculationState();
+}
+
+// 【追加】計算結果を安全にクリアするための共通関数
+function resetCalculationState() {
+    lastMatchedIndices = [];
+    const moveButton = document.getElementById('moveButton');
+    if (moveButton) {
+        moveButton.disabled = true;
+        moveButton.style.opacity = "0.5";
+        moveButton.style.cursor = "not-allowed";
+    }
+    const resultDiv = document.getElementById('result');
+    if (resultDiv) {
+        resultDiv.innerHTML = "リストが変更されました。再度「組み合わせを計算」を押してください。";
+    }
+}
 
 function playSuccessSound() {
     try {
@@ -466,26 +560,38 @@ Quagga.onDetected(function(data) {
     }, 1800);
 });
 
-// 【修正】10件目が隠れないようにスクロール位置を調整
 function insertDataToTable(name, price) {
-    const nameInputs = document.querySelectorAll('.cell-name');
-    const amountInputs = document.querySelectorAll('.cell-amount');
-    
-    for (let i = 0; i < ROW_COUNT; i++) {
-        if (nameInputs[i].value.trim() === "" && amountInputs[i].value.trim() === "") {
-            nameInputs[i].value = name;
-            amountInputs[i].value = price;
+    // データが追加されたときも計算結果をクリア
+    resetCalculationState();
 
-            // 10件目（インデックス9）以降の時、その行が確実に枠内に収まるように制御
-            if (i >= 9) {
-                const wrapper = document.getElementById('inputTableWrapper');
-                const targetRow = document.getElementById('input-row-' + i);
-                if (wrapper && targetRow) {
-                    // ヘッダーの高さ分（約35px）を考慮して、少し余裕を持たせてスクロール
-                    wrapper.scrollTop = targetRow.offsetTop - 35;
-                }
-            }
+    const tbody = document.getElementById('inputTableBody');
+    let nameInputs = document.querySelectorAll('.cell-name');
+    let amountInputs = document.querySelectorAll('.cell-amount');
+    
+    let targetIndex = -1;
+
+    for (let i = 0; i < nameInputs.length; i++) {
+        if (nameInputs[i].value.trim() === "" && amountInputs[i].value.trim() === "") {
+            targetIndex = i;
             break;
+        }
+    }
+
+    if (targetIndex === -1) {
+        targetIndex = nameInputs.length;
+        createInputRow(tbody, targetIndex);
+        nameInputs = document.querySelectorAll('.cell-name');
+        amountInputs = document.querySelectorAll('.cell-amount');
+    }
+
+    nameInputs[targetIndex].value = name;
+    amountInputs[targetIndex].value = price;
+
+    if (targetIndex >= 9) {
+        const wrapper = document.getElementById('inputTableWrapper');
+        const targetRow = document.getElementById('input-row-' + targetIndex);
+        if (wrapper && targetRow) {
+            wrapper.scrollTop = targetRow.offsetTop - 35;
         }
     }
 }
@@ -510,7 +616,7 @@ function calculateCombination() {
     const amountInputs = document.querySelectorAll('.cell-amount');
     const candidates = [];
 
-    for (let i = 0; i < ROW_COUNT; i++) {
+    for (let i = 0; i < nameInputs.length; i++) {
         const name = nameInputs[i].value.trim();
         const amountStr = amountInputs[i].value.trim();
         const amount = parseInt(amountStr, 10);
@@ -586,11 +692,13 @@ function calculateCombination() {
 function moveMatchedRows() {
     if (lastMatchedIndices.length === 0) return;
 
+    const tbody = document.getElementById('inputTableBody');
     const nameInputs = document.querySelectorAll('.cell-name');
     const amountInputs = document.querySelectorAll('.cell-amount');
     const settledTbody = document.getElementById('settledTableBody');
     const resultDiv = document.getElementById('result');
     const moveButton = document.getElementById('moveButton');
+    const wrapper = document.getElementById('inputTableWrapper');
 
     lastMatchedIndices.forEach(idx => {
         const name = nameInputs[idx].value.trim();
@@ -607,7 +715,7 @@ function moveMatchedRows() {
     });
 
     const remainingData = [];
-    for (let i = 0; i < ROW_COUNT; i++) {
+    for (let i = 0; i < nameInputs.length; i++) {
         if (!lastMatchedIndices.includes(i)) {
             const name = nameInputs[i].value.trim();
             const amount = amountInputs[i].value.trim();
@@ -617,14 +725,19 @@ function moveMatchedRows() {
         }
     }
 
-    for (let i = 0; i < ROW_COUNT; i++) {
-        if (i < remainingData.length) {
-            nameInputs[i].value = remainingData[i].name;
-            amountInputs[i].value = remainingData[i].amount;
-        } else {
-            nameInputs[i].value = "";
-            amountInputs[i].value = "";
-        }
+    const finalRowCount = Math.max(INITIAL_ROW_COUNT, remainingData.length);
+    tbody.innerHTML = ""; 
+    
+    for (let i = 0; i < finalRowCount; i++) {
+        createInputRow(tbody, i);
+    }
+
+    const newNameInputs = document.querySelectorAll('.cell-name');
+    const newAmountInputs = document.querySelectorAll('.cell-amount');
+
+    for (let i = 0; i < remainingData.length; i++) {
+        newNameInputs[i].value = remainingData[i].name;
+        newAmountInputs[i].value = remainingData[i].amount;
     }
 
     lastMatchedIndices = [];
@@ -632,7 +745,7 @@ function moveMatchedRows() {
     moveButton.style.opacity = "0.5";
     moveButton.style.cursor = "not-allowed";
     
-    document.getElementById('inputTableWrapper').scrollTop = 0;
+    wrapper.scrollTop = 0;
     
     resultDiv.innerHTML = "<span style='color:#2b6cb0;'>消込完了データを移動し、残りのリストを上に詰めました！</span>";
 }
