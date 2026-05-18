@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>入金消込 組み合わせ計算ツール (削除ボタン常時表示版)</title>
+    <title>入金消込 組み合わせ計算ツール (グレースケール2色版)</title>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
@@ -13,7 +13,7 @@
             padding: 20px;
         }
         .container {
-            max-width: 1250px;
+            max-width: 1300px;
             margin: 0 auto;
             background: #ffffff;
             padding: 30px;
@@ -157,13 +157,12 @@
             text-align: right;
         }
 
-        .delete-cell {
+        .action-cell {
             text-align: center;
             width: 40px;
         }
-        .delete-btn {
+        .delete-btn, .undo-btn {
             background: transparent;
-            color: #a0aec0;
             border: none;
             padding: 4px 8px;
             font-size: 16px;
@@ -173,13 +172,19 @@
             font-weight: normal;
             transition: color 0.2s, transform 0.1s;
         }
+        .delete-btn { color: #a0aec0; }
         .delete-btn:hover {
             background: transparent;
             color: #e53e3e;
             transform: scale(1.15);
         }
-
-        /* 【変更】進行中であっても削除ボタンを非表示にするスタイル（display:none）を削除しました */
+        
+        .undo-btn { color: #718096; font-size: 14px; }
+        .undo-btn:hover {
+            background: transparent;
+            color: #2b6cb0;
+            transform: scale(1.2);
+        }
 
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button {
@@ -196,6 +201,11 @@
         .readonly-table input {
             color: #4a5568;
             cursor: not-allowed;
+        }
+
+        .settled-row input {
+            color: #2d3748 !important;
+            font-weight: 500;
         }
 
         input[type="number"].target-input {
@@ -316,7 +326,8 @@
                         <tr>
                             <th style="width: 40px;"></th>
                             <th>商品名</th>
-                            <th style="width: 150px;">金額 (円)</th>
+                            <th style="width: 130px;">金額 (円)</th>
+                            <th style="width: 40px;"></th>
                         </tr>
                     </thead>
                     <tbody id="settledTableBody">
@@ -345,6 +356,14 @@ let isThrottling = false;
 
 let audioCtx = null;
 
+// 【変更】無彩色（グレースケール）の2色に変更
+const BLOCK_COLORS = [
+    '#ffffff', // 色A: 真っ白（未消込リストと同等のニュートラル）
+    '#e2e8f0'  // 色B: 落ち着いた明るいグレー（枠線やヘッダーと馴染むトーン）
+];
+let colorIndex = 0; 
+let blockIdCounter = 0; 
+
 window.onload = function() {
     const tbody = document.getElementById('inputTableBody');
     for (let i = 0; i < INITIAL_ROW_COUNT; i++) {
@@ -360,7 +379,7 @@ function createInputRow(tbody, index) {
         <td class="row-num">${index + 1}</td>
         <td><input type="text" class="cell-name" placeholder="自動または直接入力"></td>
         <td><input type="number" class="cell-amount amount-cell" placeholder=""></td>
-        <td class="delete-cell">
+        <td class="action-cell">
             <button class="delete-btn" title="この行を削除" onclick="deleteRowData(${index})">✕</button>
         </td>
     `;
@@ -410,11 +429,9 @@ function deleteRowData(targetIdx) {
         newAmountInputs[i].value = remainingData[i].amount;
     }
 
-    // 【変更】計算結果表示中にデータを削除した場合、不整合を防ぐため計算状態を一度リセットします
     resetCalculationState();
 }
 
-// 【追加】計算結果を安全にクリアするための共通関数
 function resetCalculationState() {
     lastMatchedIndices = [];
     const moveButton = document.getElementById('moveButton');
@@ -561,7 +578,6 @@ Quagga.onDetected(function(data) {
 });
 
 function insertDataToTable(name, price) {
-    // データが追加されたときも計算結果をクリア
     resetCalculationState();
 
     const tbody = document.getElementById('inputTableBody');
@@ -698,21 +714,37 @@ function moveMatchedRows() {
     const settledTbody = document.getElementById('settledTableBody');
     const resultDiv = document.getElementById('result');
     const moveButton = document.getElementById('moveButton');
-    const wrapper = document.getElementById('inputTableWrapper');
+
+    // グレースケールの2色を交互にローテーション
+    const currentBlockColor = BLOCK_COLORS[colorIndex];
+    colorIndex = (colorIndex + 1) % BLOCK_COLORS.length;
+    
+    const currentBlockId = `block-${blockIdCounter++}`;
 
     lastMatchedIndices.forEach(idx => {
         const name = nameInputs[idx].value.trim();
         const amount = amountInputs[idx].value.trim();
 
-        const currentSettledRows = settledTbody.querySelectorAll('tr').length;
         const tr = document.createElement('tr');
+        tr.className = "settled-row";
+        tr.style.backgroundColor = currentBlockColor;
+        
+        tr.setAttribute('data-block-id', currentBlockId);
+        tr.setAttribute('data-raw-name', name);
+        tr.setAttribute('data-raw-amount', amount);
+        
         tr.innerHTML = `
-            <td class="row-num">${currentSettledRows + 1}</td>
+            <td class="row-num" style="background-color: ${currentBlockColor};">0</td>
             <td><input type="text" value="${name}" readonly></td>
             <td><input type="text" class="amount-cell" value="${parseInt(amount, 10).toLocaleString()}" readonly></td>
+            <td class="action-cell">
+                <button class="undo-btn" title="このブロック全体の消込をキャンセルして元に戻す" onclick="undoBlockRows('${currentBlockId}')">↩</button>
+            </td>
         `;
         settledTbody.appendChild(tr);
     });
+
+    refreshSettledRowNumbers();
 
     const remainingData = [];
     for (let i = 0; i < nameInputs.length; i++) {
@@ -745,9 +777,68 @@ function moveMatchedRows() {
     moveButton.style.opacity = "0.5";
     moveButton.style.cursor = "not-allowed";
     
-    wrapper.scrollTop = 0;
-    
     resultDiv.innerHTML = "<span style='color:#2b6cb0;'>消込完了データを移動し、残りのリストを上に詰めました！</span>";
+}
+
+function undoBlockRows(blockId) {
+    const settledTbody = document.getElementById('settledTableBody');
+    const targetRows = settledTbody.querySelectorAll(`tr[data-block-id="${blockId}"]`);
+    
+    if (targetRows.length === 0) return;
+
+    if (!confirm(`このブロック（計 ${targetRows.length} 件）の消込をキャンセルし、左側の請求リストに戻しますか？`)) {
+        return;
+    }
+
+    const nameInputs = document.querySelectorAll('.cell-name');
+    const amountInputs = document.querySelectorAll('.cell-amount');
+    
+    const currentInputData = [];
+    for (let i = 0; i < nameInputs.length; i++) {
+        const name = nameInputs[i].value.trim();
+        const amount = amountInputs[i].value.trim();
+        if (name !== "" || amount !== "") {
+            currentInputData.push({ name: name, amount: amount });
+        }
+    }
+
+    targetRows.forEach(row => {
+        const rawName = row.getAttribute('data-raw-name');
+        const rawAmount = row.getAttribute('data-raw-amount');
+        currentInputData.push({ name: rawName, amount: rawAmount });
+        row.remove();
+    });
+
+    const tbody = document.getElementById('inputTableBody');
+    const finalRowCount = Math.max(INITIAL_ROW_COUNT, currentInputData.length);
+    tbody.innerHTML = "";
+    
+    for (let i = 0; i < finalRowCount; i++) {
+        createInputRow(tbody, i);
+    }
+
+    const newNameInputs = document.querySelectorAll('.cell-name');
+    const newAmountInputs = document.querySelectorAll('.cell-amount');
+    for (let i = 0; i < currentInputData.length; i++) {
+        newNameInputs[i].value = currentInputData[i].name;
+        newAmountInputs[i].value = currentInputData[i].amount;
+    }
+
+    refreshSettledRowNumbers();
+    resetCalculationState();
+    
+    document.getElementById('result').innerHTML = "<span style='color:#e53e3e;'>選択したブロックを未消込リストに戻しました。</span>";
+}
+
+function refreshSettledRowNumbers() {
+    const settledTbody = document.getElementById('settledTableBody');
+    const rows = settledTbody.querySelectorAll('tr');
+    rows.forEach((row, idx) => {
+        const numCell = row.querySelector('.row-num');
+        if (numCell) {
+            numCell.textContent = idx + 1;
+        }
+    });
 }
 </script>
 
