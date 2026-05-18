@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>入金消込 組み合わせ計算ツール (グレースケール2色版)</title>
+    <title>エクスパンドブレード登場記念 レアベイゲットキャンペーン で楽をしたい</title>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
@@ -280,10 +280,10 @@
 <body>
 
 <div class="container">
-    <h1>入金消込 組み合わせ計算ツール</h1>
+    <h1>エクスパンドブレード登場記念 レアベイゲットキャンペーン で楽をしたい</h1>
     
     <div class="scanner-section">
-        <button id="scanToggleBtn" class="scan-btn" onclick="toggleScanner()">📷 バーコードスキャン開始</button>
+        <button id="scanToggleBtn" class="scan-btn" onclick="toggleScanner()">バーコードスキャン開始</button>
         <div id="scanStatus" class="scan-status">CSVマスタを読み込み中...</div>
         <div id="interactive" class="viewport"></div>
     </div>
@@ -291,7 +291,7 @@
     <div class="main-layout">
         <!-- ① 未消込リスト -->
         <div class="column">
-            <label>① 未消込の請求リスト</label>
+            <label>① 未消込のリスト</label>
             <div id="inputTableWrapper" class="table-wrapper">
                 <table>
                     <thead>
@@ -396,7 +396,7 @@ function deleteRowData(targetIdx) {
     
     if (targetName !== `行 ${targetIdx + 1}` || targetAmount !== "") {
         const amountText = targetAmount ? ` (${parseInt(targetAmount, 10).toLocaleString()}円)` : "";
-        const confirmMessage = `選択した請求データを削除しますか？\n\n対象: ${targetName}${amountText}`;
+        const confirmMessage = `選択したデータを削除しますか？\n\n対象: ${targetName}${amountText}`;
         
         if (!confirm(confirmMessage)) {
             return; 
@@ -521,7 +521,7 @@ function toggleScanner() {
     if (isScanning) {
         Quagga.stop();
         view.style.display = 'none';
-        btn.textContent = '📷 バーコードスキャン開始';
+        btn.textContent = 'バーコードスキャン開始';
         status.textContent = 'カメラは停止しています';
         isScanning = false;
         isThrottling = false;
@@ -786,7 +786,7 @@ function undoBlockRows(blockId) {
     
     if (targetRows.length === 0) return;
 
-    if (!confirm(`このブロック（計 ${targetRows.length} 件）の消込をキャンセルし、左側の請求リストに戻しますか？`)) {
+    if (!confirm(`このブロック（計 ${targetRows.length} 件）の消込をキャンセルし、左側のリストに戻しますか？`)) {
         return;
     }
 
