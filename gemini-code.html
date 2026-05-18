@@ -10,35 +10,35 @@
             background-color: #f5f7f8;
             color: #333333;
             margin: 0;
-            padding: 20px;
+            padding: 15px; /* スマホ向けに少し余白をスリムに */
         }
         .container {
             max-width: 1300px;
             margin: 0 auto;
             background: #ffffff;
-            padding: 30px;
+            padding: 20px; /* スマホ向けにパディングを調整 */
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
         h1 {
-            font-size: 22px;
+            font-size: 20px; /* スマホで大きくはみ出さないよう少し縮小 */
             color: #4a5568;
             margin-top: 0;
-            margin-bottom: 15px; /* 下枠との余白を少し調整 */
+            margin-bottom: 15px;
             border-bottom: 2px solid #e2e8f0;
             padding-bottom: 10px;
+            text-align: center; /* スマホで見栄えが良いように中央寄せ */
         }
         
-        /* 【新機能】問い合わせ先セクションのスタイル（上部に配置するためマージンを調整） */
         .contact-section {
             background-color: #f8fafc;
             border: 1px solid #cbd5e0;
             border-radius: 6px;
-            padding: 15px 20px;
+            padding: 15px;
             font-size: 13px;
             color: #4a5568;
             line-height: 1.6;
-            margin-bottom: 20px; /* 下のカメラエリアとの間に余白を作る */
+            margin-bottom: 20px;
         }
         .contact-section h3 {
             margin-top: 0;
@@ -111,6 +111,7 @@
             text-align: center;
         }
 
+        /* レイアウト構造（PC版の基本スタイル） */
         .main-layout {
             display: flex;
             gap: 24px;
@@ -120,6 +121,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
+            min-width: 0; /* flexアイテムのはみ出し防止 */
         }
         .column.center-actions {
             flex: 0 0 220px;
@@ -145,10 +147,12 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 14px;
+            table-layout: fixed; /* 列幅を固定してはみ出しを防ぐ */
         }
         th, td {
             border: 1px solid #cbd5e0;
             padding: 0;
+            overflow: hidden;
         }
         th {
             background-color: #edf2f7;
@@ -163,7 +167,7 @@
             text-align: center;
             background-color: #edf2f7;
             color: #718096;
-            width: 40px;
+            width: 35px;
             padding: 8px 0;
             font-size: 12px;
         }
@@ -171,7 +175,7 @@
             width: 100%;
             box-sizing: border-box;
             border: none;
-            padding: 8px 10px;
+            padding: 8px 6px;
             font-size: 14px;
             background: transparent;
         }
@@ -187,15 +191,17 @@
 
         .action-cell {
             text-align: center;
-            width: 40px;
+            width: 35px;
         }
         .delete-btn, .undo-btn {
             background: transparent;
             border: none;
-            padding: 4px 8px;
+            padding: 4px 4px;
             font-size: 16px;
             cursor: pointer;
-            width: auto;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
             margin: 0;
             font-weight: normal;
             transition: color 0.2s, transform 0.1s;
@@ -241,7 +247,7 @@
             border: 1px solid #cbd5e0;
             border-radius: 6px;
             font-size: 16px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             background-color: #fafafa;
             width: 100%;
             box-sizing: border-box;
@@ -277,7 +283,7 @@
         }
         .result-section {
             margin-top: 5px;
-            margin-bottom: 5px; /* 下部マージンを最小に */
+            margin-bottom: 5px;
         }
         h2 {
             font-size: 16px;
@@ -303,6 +309,43 @@
             font-weight: bold;
             color: #2d3748;
         }
+
+        /* 📱 スマートフォン・タブレット用レスポンシブスタイル */
+        @media screen and (max-width: 850px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 15px;
+            }
+            h1 {
+                font-size: 18px;
+            }
+            /* 3つ並んでいたカラムを縦1列に落とす */
+            .main-layout {
+                flex-direction: column;
+                gap: 20px;
+            }
+            /* 操作エリアの余白調整、ボタンの向きの概念変化に伴うデザイン調整 */
+            .column.center-actions {
+                flex: auto;
+                padding-top: 0;
+                background: #f8fafc;
+                padding: 15px;
+                border-radius: 8px;
+                border: 1px dashed #cbd5e0;
+            }
+            input[type="number"].target-input {
+                margin-bottom: 10px;
+            }
+            .move-btn {
+                margin-bottom: 0;
+            }
+            /* テーブルの高さ指定をスマホ用に少しコンパクトに */
+            .table-wrapper {
+                height: 260px;
+            }
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 </head>
@@ -325,17 +368,22 @@
     </div>
     
     <div class="main-layout">
-        <!-- ① 未消込リスト -->        
         <div class="column">
             <label>① 未消込のリスト</label>
             <div id="inputTableWrapper" class="table-wrapper">
                 <table>
+                    <colgroup>
+                        <col style="width: 35px;">
+                        <col style="width: auto;">
+                        <col style="width: 90px;">
+                        <col style="width: 35px;">
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th style="width: 40px;"></th>
+                            <th></th>
                             <th>商品名</th>
-                            <th style="width: 130px;">金額 (円)</th>
-                            <th style="width: 40px;"></th>
+                            <th>金額 (円)</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody id="inputTableBody">
@@ -344,7 +392,6 @@
             </div>
         </div>
         
-        <!-- 操作エリア -->        
         <div class="column center-actions">
             <label for="target">② 目標の入金額 (円)</label>
             <input type="number" id="target" value="3000" class="target-input" placeholder="28500">
@@ -353,17 +400,22 @@
             <button id="moveButton" class="move-btn" onclick="moveMatchedRows()" disabled style="opacity: 0.5; cursor: not-allowed;">2. 消込済みへ移動 ➔</button>
         </div>
         
-        <!-- ③ 消込済みリスト -->
         <div class="column">
             <label>③ 消込済みリスト（移動先）</label>
             <div class="table-wrapper readonly-table">
                 <table>
+                    <colgroup>
+                        <col style="width: 35px;">
+                        <col style="width: auto;">
+                        <col style="width: 90px;">
+                        <col style="width: 35px;">
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th style="width: 40px;"></th>
+                            <th></th>
                             <th>商品名</th>
-                            <th style="width: 130px;">金額 (円)</th>
-                            <th style="width: 40px;"></th>
+                            <th>金額 (円)</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody id="settledTableBody">
@@ -392,10 +444,9 @@ let isThrottling = false;
 
 let audioCtx = null;
 
-// 【変更】無彩色（グレースケール）の2色に変更
 const BLOCK_COLORS = [
-    '#ffffff', // 色A: 真っ白（未消込リストと同等のニュートラル）
-    '#e2e8f0'  // 色B: 落ち着いた明るいグレー（枠線やヘッダーと馴染むトーン）
+    '#ffffff', 
+    '#e2e8f0'  
 ];
 let colorIndex = 0; 
 let blockIdCounter = 0; 
@@ -751,7 +802,6 @@ function moveMatchedRows() {
     const resultDiv = document.getElementById('result');
     const moveButton = document.getElementById('moveButton');
 
-    // グレースケールの2色を交互にローテーション
     const currentBlockColor = BLOCK_COLORS[colorIndex];
     colorIndex = (colorIndex + 1) % BLOCK_COLORS.length;
     
