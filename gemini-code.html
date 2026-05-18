@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>入金消込 組み合わせ計算ツール (マスタ限定版)</title>
+    <title>入金消込 組み合わせ計算ツール (スクロール位置補正版)</title>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
@@ -111,6 +111,7 @@
             border: 1px solid #cbd5e0;
             border-radius: 6px;
             background: #fafafa;
+            scroll-behavior: smooth; 
         }
         table {
             width: 100%;
@@ -257,7 +258,7 @@
         <!-- ① 未消込リスト -->
         <div class="column">
             <label>① 未消込の請求リスト（最大25件）</label>
-            <div class="table-wrapper">
+            <div id="inputTableWrapper" class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
@@ -317,10 +318,13 @@ let lastMatchedIndices = [];
 let isScanning = false;
 let isThrottling = false;
 
+let audioCtx = null;
+
 window.onload = function() {
     const tbody = document.getElementById('inputTableBody');
     for (let i = 0; i < ROW_COUNT; i++) {
         const tr = document.createElement('tr');
+        tr.id = `input-row-${i}`;
         tr.innerHTML = `
             <td class="row-num">${i + 1}</td>
             <td><input type="text" class="cell-name" placeholder="自動または直接入力"></td>
@@ -330,6 +334,34 @@ window.onload = function() {
     }
     loadCsvMaster();
 };
+
+function playSuccessSound() {
+    try {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.value = 1000;
+        
+        gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime); 
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.1);
+    } catch (e) {
+        console.error("オーディオの再生に失敗しました:", e);
+    }
+}
 
 function loadCsvMaster() {
     const status = document.getElementById('scanStatus');
@@ -371,6 +403,10 @@ function toggleScanner() {
     const btn = document.getElementById('scanToggleBtn');
     const status = document.getElementById('scanStatus');
 
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
     if (isScanning) {
         Quagga.stop();
         view.style.display = 'none';
@@ -404,7 +440,6 @@ function toggleScanner() {
     }
 }
 
-// バーコード検知時の処理
 Quagga.onDetected(function(data) {
     if (!isScanning || isThrottling) return; 
     if (!data.codeResult || !data.codeResult.code) return;
@@ -414,17 +449,15 @@ Quagga.onDetected(function(data) {
     
     isThrottling = true;
 
-    // 【修正箇所】マスタに存在する場合のみ、テーブルに挿入する
     if (PRODUCT_MASTER[code]) {
         const matchedItem = PRODUCT_MASTER[code];
         insertDataToTable(matchedItem.name, matchedItem.price);
         status.textContent = `✅ 「${matchedItem.name} (${matchedItem.price}円)」を入力しました！`;
+        playSuccessSound();
     } else {
-        // 未登録の場合は挿入処理（insertDataToTable）を呼ばず、警告メッセージのみ表示
         status.textContent = `⚠️ マスタに未登録のコードです (${code}) - 追加をスキップしました`;
     }
 
-    // 次のバーコード読み込みのための待機（1.8秒後にロック解除）
     setTimeout(() => {
         if (isScanning) {
             isThrottling = false;
@@ -433,6 +466,7 @@ Quagga.onDetected(function(data) {
     }, 1800);
 });
 
+// 【修正】10件目が隠れないようにスクロール位置を調整
 function insertDataToTable(name, price) {
     const nameInputs = document.querySelectorAll('.cell-name');
     const amountInputs = document.querySelectorAll('.cell-amount');
@@ -441,7 +475,16 @@ function insertDataToTable(name, price) {
         if (nameInputs[i].value.trim() === "" && amountInputs[i].value.trim() === "") {
             nameInputs[i].value = name;
             amountInputs[i].value = price;
-            nameInputs[i].focus();
+
+            // 10件目（インデックス9）以降の時、その行が確実に枠内に収まるように制御
+            if (i >= 9) {
+                const wrapper = document.getElementById('inputTableWrapper');
+                const targetRow = document.getElementById('input-row-' + i);
+                if (wrapper && targetRow) {
+                    // ヘッダーの高さ分（約35px）を考慮して、少し余裕を持たせてスクロール
+                    wrapper.scrollTop = targetRow.offsetTop - 35;
+                }
+            }
             break;
         }
     }
@@ -588,6 +631,8 @@ function moveMatchedRows() {
     moveButton.disabled = true;
     moveButton.style.opacity = "0.5";
     moveButton.style.cursor = "not-allowed";
+    
+    document.getElementById('inputTableWrapper').scrollTop = 0;
     
     resultDiv.innerHTML = "<span style='color:#2b6cb0;'>消込完了データを移動し、残りのリストを上に詰めました！</span>";
 }
