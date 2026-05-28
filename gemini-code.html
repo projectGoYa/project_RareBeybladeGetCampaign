@@ -135,6 +135,13 @@
             font-size: 14px;
         }
         
+        .count-badge {
+            font-size: 13px;
+            color: #4a5568;
+            font-weight: normal;
+            margin-left: 4px;
+        }
+        
         .table-wrapper {
             height: 330px;
             overflow-y: auto;
@@ -170,6 +177,7 @@
             width: 35px;
             padding: 8px 0;
             font-size: 12px;
+            transition: background-color 0.2s;
         }
         table input {
             width: 100%;
@@ -242,6 +250,11 @@
             font-weight: 500;
         }
 
+        /* ブロックの最下行の境界線を太くするスタイル */
+        .block-bottom-row td {
+            border-bottom: 2px solid #4a5568 !important;
+        }
+
         input[type="number"].target-input {
             padding: 12px;
             border: 1px solid #cbd5e0;
@@ -312,21 +325,10 @@
 
         /* 📱 スマートフォン・タブレット用レスポンシブスタイル */
         @media screen and (max-width: 850px) {
-            body {
-                padding: 10px;
-            }
-            .container {
-                padding: 15px;
-            }
-            h1 {
-                font-size: 18px;
-            }
-            /* 3つ並んでいたカラムを縦1列に落とす */
-            .main-layout {
-                flex-direction: column;
-                gap: 20px;
-            }
-            /* 操作エリアの余白調整、ボタンの向きの概念変化に伴うデザイン調整 */
+            body { padding: 10px; }
+            .container { padding: 15px; }
+            h1 { font-size: 16px; }
+            .main-layout { flex-direction: column; gap: 20px; }
             .column.center-actions {
                 flex: auto;
                 padding-top: 0;
@@ -335,29 +337,13 @@
                 border-radius: 8px;
                 border: 1px dashed #cbd5e0;
             }
-            input[type="number"].target-input {
-                margin-bottom: 10px;
-            }
-            .move-btn {
-                margin-bottom: 0;
-            }
-            /* テーブルの高さ指定をスマホ用に少しコンパクトに */
-            .table-wrapper {
-                height: 260px;
-            }
+            input[type="number"].target-input { margin-bottom: 10px; }
+            .move-btn { margin-bottom: 0; }
+            .table-wrapper { height: 260px; }
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 </head>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-0BQGP25H59"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-0BQGP25H59');
-</script>
 <body>
 
 <div class="container">
@@ -410,7 +396,7 @@
         </div>
         
         <div class="column">
-            <label>③ 消込済みリスト（移動先）</label>
+            <label>③ 消込済みリスト（移動先）<span id="settledCount" class="count-badge">（消込回数: 0 回）</span></label>
             <div class="table-wrapper readonly-table">
                 <table>
                     <colgroup>
@@ -453,11 +439,11 @@ let isThrottling = false;
 
 let audioCtx = null;
 
+// 背景色のパターン
 const BLOCK_COLORS = [
-    '#ffffff', 
-    '#e2e8f0'  
+    '#ffffff', // 白
+    '#e2e8f0'  // 薄グレー
 ];
-let colorIndex = 0; 
 let blockIdCounter = 0; 
 
 window.onload = function() {
@@ -810,26 +796,22 @@ function moveMatchedRows() {
     const settledTbody = document.getElementById('settledTableBody');
     const resultDiv = document.getElementById('result');
     const moveButton = document.getElementById('moveButton');
-
-    const currentBlockColor = BLOCK_COLORS[colorIndex];
-    colorIndex = (colorIndex + 1) % BLOCK_COLORS.length;
     
     const currentBlockId = `block-${blockIdCounter++}`;
 
-    lastMatchedIndices.forEach(idx => {
+    lastMatchedIndices.forEach((idx) => {
         const name = nameInputs[idx].value.trim();
         const amount = amountInputs[idx].value.trim();
 
         const tr = document.createElement('tr');
         tr.className = "settled-row";
-        tr.style.backgroundColor = currentBlockColor;
         
         tr.setAttribute('data-block-id', currentBlockId);
         tr.setAttribute('data-raw-name', name);
         tr.setAttribute('data-raw-amount', amount);
         
         tr.innerHTML = `
-            <td class="row-num" style="background-color: ${currentBlockColor};">0</td>
+            <td class="row-num">0</td>
             <td><input type="text" value="${name}" readonly></td>
             <td><input type="text" class="amount-cell" value="${parseInt(amount, 10).toLocaleString()}" readonly></td>
             <td class="action-cell">
@@ -839,6 +821,7 @@ function moveMatchedRows() {
         settledTbody.appendChild(tr);
     });
 
+    // 移動完了後に全体の番号・シマシマ背景色を完全更新する
     refreshSettledRowNumbers();
 
     const remainingData = [];
@@ -919,6 +902,7 @@ function undoBlockRows(blockId) {
         newAmountInputs[i].value = currentInputData[i].amount;
     }
 
+    // 戻した後に残りの全体の番号・シマシマ背景色を完全リフレッシュ
     refreshSettledRowNumbers();
     resetCalculationState();
     
@@ -928,12 +912,52 @@ function undoBlockRows(blockId) {
 function refreshSettledRowNumbers() {
     const settledTbody = document.getElementById('settledTableBody');
     const rows = settledTbody.querySelectorAll('tr');
+    
+    const blockLastRowMap = {};
+    const uniqueBlockIds = new Set();
+    
+    let localColorMap = {}; // blockIdごとに割り当てる色を保持するマップ
+    let currentColorIdx = 0;
+
     rows.forEach((row, idx) => {
         const numCell = row.querySelector('.row-num');
         if (numCell) {
             numCell.textContent = idx + 1;
         }
+        
+        // 前回の残骸クラスを必ず一度クリア
+        row.classList.remove('block-bottom-row');
+        
+        const blockId = row.getAttribute('data-block-id');
+        if (blockId) {
+            uniqueBlockIds.add(blockId);
+            blockLastRowMap[blockId] = row; // 上書きにより最後の一行がこのマップに残る
+
+            // このブロックにまだ背景色が割り当てられていなければ、交互に決定
+            if (!(blockId in localColorMap)) {
+                localColorMap[blockId] = BLOCK_COLORS[currentColorIdx];
+                currentColorIdx = (currentColorIdx + 1) % BLOCK_COLORS.length;
+            }
+            
+            // 決定した背景色を、行全体と「No.を表示している左端のセル」へ強制適用
+            const targetColor = localColorMap[blockId];
+            row.style.backgroundColor = targetColor;
+            if (numCell) {
+                numCell.style.backgroundColor = targetColor;
+            }
+        }
     });
+    
+    // 確定した各ブロックの最下行に対してのみ、境界線を太くするクラスを再適用
+    Object.values(blockLastRowMap).forEach(row => {
+        row.classList.add('block-bottom-row');
+    });
+    
+    // 消込回数のカウント数を更新して表示
+    const countSpan = document.getElementById('settledCount');
+    if (countSpan) {
+        countSpan.textContent = `（消込回数: ${uniqueBlockIds.size} 回）`;
+    }
 }
 </script>
 
